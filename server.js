@@ -1,53 +1,68 @@
-// Import the framework and instantiate it
-import Fastify from 'fastify'
+import Fastify from 'fastify';
+import { SplitFactory } from '@splitsoftware/splitio';
+import dotenv from 'dotenv';
+import crypto from 'crypto';
+
+// Cargar variables de entorno desde config.env
+dotenv.config({ path: './config.env' });
+
 const fastify = Fastify({
     logger: true
-})
+});
 
-// Use the import let = require syntax on TS.
-import { SplitFactory } from '@splitsoftware/splitio';
-// Instantiate the SDK
 const factory = SplitFactory({
     core: {
-        authorizationKey: 'no7juaokpf9e31h5ivhen3v8lej3aolmo3k9',
-    
+        authorizationKey: process.env.SPLIT_AUTH_KEY,
         key: 'on'
     },
     startup: {
         readyTimeout: 1.5 // 1.5 sec
     }
 });
-// And get the client instance you'll use
+
 const SplitIOClient = factory.client();
 
 let keyUp = 'on';
 
-// Declare a route
 fastify.get('/', async function handler(request, reply) {
+    try {
+        const idClient = crypto.randomUUID();
 
-    const idClient = crypto.randomUUID();
-   
+        // Espera a que el cliente de Split.io esté listo
+        await SplitIOClient.ready();
 
-    const treatment =
-        SplitIOClient.getTreatment(idClient, 'experimento_1');
-    if (treatment == 'on') {
-        keyUp = 'on';
-    } else if (treatment == 'off') {
-        keyUp = 'off';
-    } else if (treatment == 'facu') {
-        keyUp = 'facu';
-    }else {
-        // insert your control treatment code here
+        const treatment = SplitIOClient.getTreatment(idClient, 'experimento_1');
+
+        switch (treatment) {
+            case 'on':
+                keyUp = 'on';
+                break;
+            case 'off':
+                keyUp = 'off';
+                break;
+            case 'facu':
+                keyUp = 'facu';
+                break;
+            default:
+                keyUp = 'control';
+                break;
+        }
+
+        return { "experimento_1": keyUp, "idClient": idClient, treatment: treatment };
+    } catch (error) {
+        fastify.log.error(error);
+        reply.status(500).send({ error: 'Internal Server Error' });
     }
+});
 
+const start = async () => {
+    try {
+        await fastify.listen({ port: 3000 });
+        fastify.log.info(`Server listening on port 3000`);
+    } catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+};
 
-    return { "experimento_1": keyUp, "idClient": idClient , treatment : treatment }
-})
-
-// Run the server!
-try {
-    await fastify.listen({ port: 3000 })
-} catch (err) {
-    fastify.log.error(err)
-    process.exit(1)
-}
+start();
