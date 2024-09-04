@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@splitsoftware/splitio": "^10.27.0",
+    "dotenv": "^16.4.5",
     "fastify": "^4.28.1"
   }
 }
